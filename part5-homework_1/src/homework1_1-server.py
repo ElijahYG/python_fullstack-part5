@@ -3,19 +3,6 @@
 __author__ = "Elijah"
 __date__ = "2017/9/14 14:15"
 
-'''
-FTP开发:
-     1. 用户加密认证
-     2. 多用户同时登陆
-     3. 每个用户有自己的家目录且只能访问自己的家目录
-     4. 对用户进行磁盘配额、不同用户配额可不同
-     5. 用户可以登陆server后，可切换目录
-     6. 查看当前目录下文件
-     7. 上传下载文件，保证文件一致性
-     8. 传输过程中现实进度条
-     9. 支持断点续传
-'''
-
 import hmac
 import json
 import os
@@ -29,7 +16,6 @@ import struct
 class ftpserver(socketserver.BaseRequestHandler):
     max_packet_size = 8192
     coding = 'utf-8'
-    # BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     BASE_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
     files_dir = '\\files\\'
     config_dir = '\\conf\\'
@@ -139,7 +125,7 @@ class ftpserver(socketserver.BaseRequestHandler):
 
     def secret_key(self):
         '''
-        √生成随机校验码，以便进行认证
+        生成随机校验码，以便进行认证
         :return: 6位bytes格式的数字+字母组合校验码
         '''
         auth_key = string.ascii_lowercase + string.digits
@@ -174,7 +160,6 @@ class ftpserver(socketserver.BaseRequestHandler):
             # print('用户的目录下包含：')
             for f in files:
                 size += os.path.getsize(os.path.join(root, f))
-                # print('文件：\033[4m %s \033[0m   大小：\033[1;32m %.2f \033[0m MB' % (f, ((os.path.getsize(os.path.join(root, f))) / 1048576)))
         return size
 
     def upload(self, head_dic):
@@ -183,23 +168,18 @@ class ftpserver(socketserver.BaseRequestHandler):
         :param args:报头字典{'command': 操作命令, 'file_name': 文件名称, 'file_size': 文件大小,'user_name': 用户名}
         :return:
         '''
-        # 读取用户磁盘限额
         with open(self.BASE_DIR + self.config_dir + 'config.txt', 'rb') as f:
             config_dict = pickle.load(f)
             space = config_dict[bytes(head_dic['user_name'],encoding=self.coding)][1]
             user_space = int(str(space,encoding=self.coding))
         while True:
-            # 文件路径-每个用户一个目录
-            # f_name = head_dic['file_name'].split('/')[-1]
             f_name = os.path.basename(head_dic['file_name'])
             file_path = self.BASE_DIR + self.files_dir + head_dic['user_name'] + '\\'
             try:
                 os.mkdir(file_path)
             except Exception as e:
                 pass
-            # 文件大小
             file_size = head_dic['file_size']
-            # 判断文件是否已经存在，若存在是否断点续传
             if os.path.exists(os.path.join(file_path, f_name)):
                 print('用户上传文件已经存在,询问用户是否继续上传...')
                 self.request.send(bytes('file_already_exist', encoding=self.coding))
@@ -219,7 +199,6 @@ class ftpserver(socketserver.BaseRequestHandler):
                     print('客户端：' + head_dic['user_name'] + ' 文件：' + f_name + ' 上传完成！')
                     break
             else:
-                # 判断用户配额空间是否充足-每个用户配额 10485760 字节
                 directory_size = self.get_directorysize(file_path)
                 if (directory_size + file_size) > user_space * 1024 * 1024:
                     print('用户：' + head_dic['user_name'] + ' 上传文件后目录空间将超过 ' + str(user_space) + ' MB 限额，上传文件失败！')
@@ -230,11 +209,9 @@ class ftpserver(socketserver.BaseRequestHandler):
                         break
                 else:
                     self.request.send(bytes('Directory_space_available', encoding=self.coding))
-                    # 接收到的文件大小
                     recv_size = 0
                     print('----->', file_path)
-                    with open(os.path.join(file_path, f_name), 'wb') as f_w:  # 必须这个打开文件，不然如果没有该文件的话报错
-                        # with open(file_path, 'wb') as f_w:
+                    with open(os.path.join(file_path, f_name), 'wb') as f_w: 
                         while recv_size < file_size:
                             recv_data = self.request.recv(self.max_packet_size)
                             f_w.write(recv_data)
@@ -259,15 +236,10 @@ class ftpserver(socketserver.BaseRequestHandler):
             for root, dirs, files in os.walk(file_path):
                 for f in files:
                     files_dict[f] = os.path.getsize(os.path.join(root, f))
-            # 服务端将目录字典序列化
             files_dict_json = json.dumps(files_dict)
-            # 服务端将序列化的目录字典bytes化
             files_dict_json_bytes = bytes(files_dict_json, encoding=self.coding)
-            # 将bytes化的目录字典打包
             files_dict_json_bytes_struct = struct.pack('i', len(files_dict_json_bytes))
-            # 服务端将打包的字典发送给客户端
             self.request.send(files_dict_json_bytes_struct)
-            # 服务端接收客户端是否收到报头
             is_received = self.request.recv(1024)
             if is_received == b'files_dict_json_bytes_struct_received':
                 self.request.send(files_dict_json_bytes)
@@ -278,7 +250,6 @@ class ftpserver(socketserver.BaseRequestHandler):
             f_name = self.request.recv(1024)
             self.request.send(bytes('file_name_received', encoding=self.coding))
             file_path = self.BASE_DIR + self.files_dir + head_dic['user_name'] + '\\'
-            # with open(os.path.join(file_path, os.path.basename(f_name)), 'rb') as f:
             with open(file_path + str(f_name, encoding=self.coding), 'rb') as f:
                 for line in f:
                     self.request.send(line)
@@ -306,15 +277,10 @@ class ftpserver(socketserver.BaseRequestHandler):
             for root, dirs, files in os.walk(file_path):
                 for f in files:
                     files_dict[f] = os.path.getsize(os.path.join(root, f))
-            # 服务端将目录字典序列化
             files_dict_json = json.dumps(files_dict)
-            # 服务端将序列化的目录字典bytes化
             files_dict_json_bytes = bytes(files_dict_json, encoding=self.coding)
-            # 将bytes化的目录字典打包
             files_dict_json_bytes_struct = struct.pack('i', len(files_dict_json_bytes))
-            # 服务端将打包的字典发送给客户端
             self.request.send(files_dict_json_bytes_struct)
-            # 服务端接收客户端是否收到报头
             is_received = self.request.recv(1024)
             if is_received == b'files_dict_json_bytes_struct_received':
                 self.request.send(files_dict_json_bytes)
@@ -337,15 +303,10 @@ class ftpserver(socketserver.BaseRequestHandler):
             for root, dirs, files in os.walk(file_path):
                 for f in files:
                     files_dict[f] = os.path.getsize(os.path.join(root, f))
-            # 服务端将目录字典序列化
             files_dict_json = json.dumps(files_dict)
-            # 服务端将序列化的目录字典bytes化
             files_dict_json_bytes = bytes(files_dict_json, encoding=self.coding)
-            # 将bytes化的目录字典打包
             files_dict_json_bytes_struct = struct.pack('i', len(files_dict_json_bytes))
-            # 服务端将打包的字典发送给客户端
             self.request.send(files_dict_json_bytes_struct)
-            # 服务端接收客户端是否收到报头
             is_received = self.request.recv(1024)
             if is_received == b'files_dict_json_bytes_struct_received':
                 self.request.send(files_dict_json_bytes)
@@ -356,11 +317,6 @@ class ftpserver(socketserver.BaseRequestHandler):
             f_name = self.request.recv(1024)
             self.request.send(bytes('file_name_received', encoding=self.coding))
             file_path = self.BASE_DIR + self.files_dir + head_dic['user_name'] + '\\'
-            # with open(file_path+str(f_name,encoding=self.coding), 'rb') as f:
-            #     for line in f:
-            #         self.request.send(line)
-            #         send_size += len(line)
-            #         print(('文件下载进度：%.2f KB / %.2f KB')%(send_size,(files_dict[str(f_name,encoding=self.coding)])))
             is_ready_for_delete = self.request.recv(1024)
             if is_ready_for_delete == b'ready_for_delete':
                 os.remove(file_path + str(f_name, encoding=self.coding))
@@ -376,35 +332,27 @@ class ftpserver(socketserver.BaseRequestHandler):
         handle方法
         :return:
         '''
-        # 循环体—用户登陆、注册
         while True:
             user_choice = self.request.recv(1024)
-            if user_choice == b'1':  # 登陆
+            if user_choice == b'1':  
                 self.login()
                 print('--->这话可以删除了--->进入下一阶段功能选择！')
                 break
-            elif user_choice == b'2':  # 注册
+            elif user_choice == b'2':  
                 self.register()
             else:
                 self.request.send(bytes('对不起，您的输入有误！请重新输入！', encoding=self.coding))
                 print('用户输入有误！')
                 continue
-        # 循环体—开始进行通讯
         while True:
             try:
-                # 接受固定报头4字节
                 head_struct = self.request.recv(4)
                 self.request.send(bytes('head_struct_received', encoding=self.coding))
                 if not head_struct:
                     break
-                # 解包报头，取出第一个报头长度
                 head_len = struct.unpack('i', head_struct)[0]
-                # 根据报头长度，收取序列化的字典对象
                 head_json = self.request.recv(head_len).decode(self.coding)
-                # 反序列化，收取字典
                 head_dic = json.loads(head_json)
-                # 报头字典{'command': 操作命令, 'file_name': 文件名称, 'file_size': 文件大小，'user_name': 用户名}
-                # self.request.send(head_dic)
                 cmd = head_dic['command']
                 if hasattr(self, cmd):
                     func = getattr(self, cmd)
