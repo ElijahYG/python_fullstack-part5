@@ -22,7 +22,7 @@ class ftpclient:
 
     def __init__(self, server_address, connect=True):
         '''
-        √初始化客户端
+        初始化客户端
         :param server_address: 服务器IP与Port信息
         :param connect: 是否立即创建连接，默认选项True
         '''
@@ -37,14 +37,14 @@ class ftpclient:
 
     def client_connect(self):
         '''
-        √客户端建立连接
+        客户端建立连接
         :return:
         '''
         self.socket.connect(self.server_address)
 
     def client_close(self):
         '''
-        √客户端关闭连接
+        客户端关闭连接
         :return:
         '''
         self.socket.close()
@@ -109,7 +109,6 @@ class ftpclient:
                             send_size += len(line)
                             print('文件上传进度：' + str(round((send_size / 1024), 2)) + ' KB / ' + str(
                                 round((head_dic['file_size'] / 1024), 2)) + ' KB')
-                        # print('文件 ' + head_dic['file_name'].split('/')[-1] + ' 上传完成！\n')
                         print('文件 ' + os.path.basename(head_dic['file_name']) + ' 上传完成！\n')
                         break
                 else:
@@ -135,17 +134,12 @@ class ftpclient:
             if is_received == b'head_struct_received':
                 self.socket.send(head_json_bytes)
                 recv_size = 0
-                # 客户端收目录报头打包
                 files_dict_json_bytes_struct = self.socket.recv(4)
-                # 客户端发送收到报头信息
                 self.socket.send(bytes('files_dict_json_bytes_struct_received', encoding=self.coding))
                 if not files_dict_json_bytes_struct:
                     break
-                # 客户端解包，得到序列化字典长度
                 files_dict_json_len = struct.unpack('i', files_dict_json_bytes_struct)[0]
-                # 客户端得到序列化字典
                 files_dict_json = self.socket.recv(files_dict_json_len).decode(self.coding)
-                # 客户端得到目录文件字典{'文件名':'文件字节大小'}
                 files_dict = json.loads(files_dict_json)
                 print('用户：' + head_dic['user_name'] + '的目录为：')
                 for k, v in files_dict.items():
@@ -163,8 +157,7 @@ class ftpclient:
                 is_filename_received = self.socket.recv(1024)
                 if (download_filename != '') and (is_filename_received == b'file_name_received'):
                     with open(os.path.join(head_dic['file_name'], os.path.basename(download_filename)),
-                              'wb') as f_w:  # 必须这个打开文件，不然如果没有该文件的话报错
-                        # with open(file_path, 'wb') as f_w:
+                              'wb') as f_w:  
                         while recv_size < int(files_dict[download_filename]):
                             recv_data = self.socket.recv(self.max_packet_size)
                             f_w.write(recv_data)
@@ -194,17 +187,12 @@ class ftpclient:
             is_received = self.socket.recv(1024)
             if is_received == b'head_struct_received':
                 self.socket.send(head_json_bytes)
-                # 客户端收目录报头打包
                 files_dict_json_bytes_struct = self.socket.recv(4)
-                # 客户端发送收到报头信息
                 self.socket.send(bytes('files_dict_json_bytes_struct_received', encoding=self.coding))
                 if not files_dict_json_bytes_struct:
                     break
-                # 客户端解包，得到序列化字典长度
                 files_dict_json_len = struct.unpack('i', files_dict_json_bytes_struct)[0]
-                # 客户端得到序列化字典
                 files_dict_json = self.socket.recv(files_dict_json_len).decode(self.coding)
-                # 客户端得到目录文件字典{'文件名':'文件字节大小'}
                 files_dict = json.loads(files_dict_json)
                 print('用户：' + head_dic['user_name'] + '的上传目录为：')
                 for k, v in files_dict.items():
@@ -231,17 +219,12 @@ class ftpclient:
             if is_received == b'head_struct_received':
                 self.socket.send(head_json_bytes)
                 recv_size = 0
-                # 客户端收目录报头打包
                 files_dict_json_bytes_struct = self.socket.recv(4)
-                # 客户端发送收到报头信息
                 self.socket.send(bytes('files_dict_json_bytes_struct_received', encoding=self.coding))
                 if not files_dict_json_bytes_struct:
                     break
-                # 客户端解包，得到序列化字典长度
                 files_dict_json_len = struct.unpack('i', files_dict_json_bytes_struct)[0]
-                # 客户端得到序列化字典
                 files_dict_json = self.socket.recv(files_dict_json_len).decode(self.coding)
-                # 客户端得到目录文件字典{'文件名':'文件字节大小'}
                 files_dict = json.loads(files_dict_json)
                 print('用户：' + head_dic['user_name'] + '的目录为：')
                 for k, v in files_dict.items():
@@ -258,13 +241,6 @@ class ftpclient:
                         delete_filename = ''
                 is_filename_received = self.socket.recv(1024)
                 if (delete_filename != '') and (is_filename_received == b'file_name_received'):
-                    # with open(os.path.join(head_dic['file_name'], os.path.basename(delete_filename)), 'wb') as f_w: # 必须这个打开文件，不然如果没有该文件的话报错
-                    #     # with open(file_path, 'wb') as f_w:
-                    #     while recv_size < int(files_dict[delete_filename]):
-                    #         recv_data = self.socket.recv(self.max_packet_size)
-                    #         f_w.write(recv_data)
-                    #         recv_size += len(recv_data)
-                    #         print(('文件下载进度：%.2f KB / %.2f KB')%(recv_size,(files_dict[delete_filename])))
                     self.socket.send(bytes('ready_for_delete', encoding=self.coding))
                     is_finished = self.socket.recv(1024)
                     if is_finished == b'deleted_finished':
@@ -289,7 +265,6 @@ class ftpclient:
         用户执行功能
         :return:
         '''
-        # 用户登陆
         u_space = 0
         end_loop = True
         while end_loop:
@@ -370,7 +345,6 @@ class ftpclient:
                 print('对不起，您输入的功能编号有误，请重新输入！')
                 continue
 
-        # 进行功能选择
         end_func = True
         choice_dict = {'1': 'upload', '2': 'download', '3': 'show_dir', '4': 'delete_file', '5': 'user_exit', }
         while end_func:
